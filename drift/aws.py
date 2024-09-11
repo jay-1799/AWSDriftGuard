@@ -13,6 +13,14 @@ cloudfront_client = boto3.client('cloudfront')
 efs_client = boto3.client('efs')
 sns_client = boto3.client('sns')
 sqs_client = boto3.client('sqs')
+elasticbeanstalk_client = boto3.client('elasticbeanstalk')
+autoscaling_client = boto3.client('autoscaling')
+elasticache_client = boto3.client('elasticache')
+secretsmanager_client = boto3.client('secretsmanager')
+glue_client = boto3.client('glue')
+redshift_client = boto3.client('redshift')
+sagemaker_client = boto3.client('sagemaker')
+stepfunctions_client = boto3.client('stepfunctions')
 
 def get_ec2_instances():
     response = ec2_client.describe_instances()
@@ -143,9 +151,98 @@ def get_sqs_queues():
 
 
 
+def get_elastic_beanstalk_environments():
+    response = elasticbeanstalk_client.describe_environments()
+    environments = []
+    for env in response['Environments']:
+        environments.append({
+            'EnvironmentName': env.get('EnvironmentName'),
+            'ApplicationName': env.get('ApplicationName'),
+            'EnvironmentId': env.get('EnvironmentId'),
+            'Status': env.get('Status'),
+        })
+    return environments
 
+def get_step_functions():
+    response = stepfunctions_client.list_state_machines()
+    state_machines = []
+    for sm in response['stateMachines']:
+        state_machines.append({
+            'Name': sm.get('name'),
+            'StateMachineArn': sm.get('stateMachineArn'),
+            'CreationDate': sm.get('creationDate')
+        })
+    return state_machines
 
+def get_sagemaker_models():
+    response = sagemaker_client.list_models()
+    models = []
+    for model in response['Models']:
+        models.append({
+            'ModelName': model.get('ModelName'),
+            'CreationTime': model.get('CreationTime'),
+            'ModelArn': model.get('ModelArn')
+        })
+    return models
 
+def get_redshift_clusters():
+    response = redshift_client.describe_clusters()
+    clusters = []
+    for cluster in response['Clusters']:
+        clusters.append({
+            'ClusterIdentifier': cluster.get('ClusterIdentifier'),
+            'NodeType': cluster.get('NodeType'),
+            'ClusterStatus': cluster.get('ClusterStatus'),
+            'ClusterCreateTime': cluster.get('ClusterCreateTime')
+        })
+    return clusters
+
+def get_auto_scaling_groups():
+    response = autoscaling_client.describe_auto_scaling_groups()
+    autoscaling_groups = []
+    for group in response['AutoScalingGroups']:
+        autoscaling_groups.append({
+            'AutoScalingGroupName': group.get('AutoScalingGroupName'),
+            'LaunchConfigurationName': group.get('LaunchConfigurationName'),
+            'MinSize': group.get('MinSize'),
+            'MaxSize': group.get('MaxSize'),
+            'DesiredCapacity': group.get('DesiredCapacity')
+        })
+    return autoscaling_groups
+
+def get_elasticache_clusters():
+    response = elasticache_client.describe_cache_clusters()
+    clusters = []
+    for cluster in response['CacheClusters']:
+        clusters.append({
+            'CacheClusterId': cluster.get('CacheClusterId'),
+            'Engine': cluster.get('Engine'),
+            'CacheNodeType': cluster.get('CacheNodeType'),
+            'CacheClusterStatus': cluster.get('CacheClusterStatus')
+        })
+    return clusters
+
+def get_secrets_manager_secrets():
+    response = secretsmanager_client.list_secrets()
+    secrets = []
+    for secret in response['SecretList']:
+        secrets.append({
+            'Name': secret.get('Name'),
+            'SecretArn': secret.get('ARN'),
+            'LastChangedDate': secret.get('LastChangedDate')
+        })
+    return secrets
+
+def get_glue_jobs():
+    response = glue_client.get_jobs()
+    jobs = []
+    for job in response['Jobs']:
+        jobs.append({
+            'JobName': job.get('Name'),
+            'JobArn': job.get('Role'),
+            'CreatedOn': job.get('CreatedOn')
+        })
+    return jobs
 
 if __name__ == "__main__":
     
@@ -164,4 +261,12 @@ if __name__ == "__main__":
     print("efs filesystems:", get_efs_filesystems())
     print("SNS Topics:", get_sns_topics())
     print("SQS Queues:", get_sqs_queues())
+    print("elastic beanstalk environments:", get_elastic_beanstalk_environments())
+    print("step functions:", get_step_functions())
+    print("glue jobs:", get_glue_jobs())
+    print("secrets:", get_secrets_manager_secrets())
+    print("elastic cache clusters:", get_elasticache_clusters())
+    print("redshift clusters:", get_redshift_clusters())
+    print("auto scaling groups:", get_auto_scaling_groups())
+    print("sagemaker models:", get_sagemaker_models())
 
