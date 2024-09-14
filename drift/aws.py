@@ -21,252 +21,321 @@ glue_client = boto3.client('glue')
 redshift_client = boto3.client('redshift')
 sagemaker_client = boto3.client('sagemaker')
 stepfunctions_client = boto3.client('stepfunctions')
+kinesis_client = boto3.client('kinesis')
+codepipeline_client = boto3.client('codepipeline')
+codedeploy_client = boto3.client('codedeploy')
+mq_client = boto3.client('mq')
+workspaces_client = boto3.client('workspaces')
+codebuild_client = boto3.client('codebuild')
 
+
+aws_resources = {
+}
 def get_ec2_instances():
     response = ec2_client.describe_instances()
-    instances = []
+    aws_resources['aws_instance'] = {}
     for reservation in response['Reservations']:
         for instance in reservation['Instances']:
-            instances.append({
-                'InstanceId': instance.get('InstanceId'),
-                'InstanceType': instance.get('InstanceType'),
-                'State': instance['State'].get('Name'),
-                'Tags': {tag['Key']: tag['Value'] for tag in instance.get('Tags', [])}
-            })
-    return instances
+            instance_id = instance.get('InstanceId')
+            aws_resources['aws_instance'][instance_id] = {
+                        'InstanceType': instance.get('InstanceType'),
+                        'State': instance['State'].get('Name'),
+                        'Tags': {tag['Key']: tag['Value'] for tag in instance.get('Tags', [])}
+                    }
 
 def get_s3_buckets():
+    aws_resources['S3'] = {}
     response = s3_client.list_buckets()
-    buckets = [{'BucketName': bucket['Name']} for bucket in response['Buckets']]
-    return buckets
+    for bucket in response['Buckets']:
+            bucket_name = bucket['Name']
+            aws_resources['S3'][bucket_name] = {'BucketName': bucket_name}
 
 def get_rds_instances():
+    aws_resources['RDS'] = {}
     response = rds_client.describe_db_instances()
-    instances = []
     for instance in response['DBInstances']:
-        instances.append({
-            'DBInstanceIdentifier': instance.get('DBInstanceIdentifier'),
-            'DBInstanceArn': instance.get('DBInstanceArn'),
-            'DBInstanceClass': instance.get('DBInstanceClass'),
-            'Engine': instance.get('Engine'),
-            'Status': instance.get('DBInstanceStatus')
-        })
-    return instances
+        db_identifier = instance.get('DBInstanceIdentifier')
+        aws_resources['RDS'][db_identifier] = {
+                    'DBInstanceArn': instance.get('DBInstanceArn'),
+                    'DBInstanceClass': instance.get('DBInstanceClass'),
+                    'Engine': instance.get('Engine'),
+                    'Status': instance.get('DBInstanceStatus')
+                }
 
 def get_iam_roles():
+    aws_resources['IAM Roles'] = {}
     response = iam_client.list_roles()
-    roles = [{'RoleName': role['RoleName'], 'RoleArn': role['Arn']} for role in response['Roles']]
-    return roles
+    for role in response['Roles']:
+        role_name = role.get('RoleName')
+        aws_resources['IAM Roles'][role_name] = {'RoleName': role['RoleName'], 'RoleArn': role['Arn']}
+
 
 def get_vpcs():
+    aws_resources['VPC']={}
     response = ec2_client.describe_vpcs()
-    vpcs = [{'VpcId': vpc['VpcId'], 'CidrBlock': vpc['CidrBlock']} for vpc in response['Vpcs']]
-    return vpcs
+    for vpc in response['Vpcs']:
+        VpcId=vpc.get('VpcId')
+        aws_resources['VPC'][VpcId]={'VpcId': vpc['VpcId'], 'CidrBlock': vpc['CidrBlock']}
 
 def get_lambda_functions():
+    aws_resources['Lambda Functions'] = {}
     response = lambda_client.list_functions()
-    functions = [{'functionName': function['FunctionName'],'Runtime':function['Runtime'],'Function ARN':function['FunctionArn']} for function in response['Functions']]
-    return functions
-
-def get_cloudformation_stacks():
-    response = cloudformation_client.describe_stacks()
-    stacks = [{'StackName': stack['StackName'], 'StackId': stack['StackId'], 'StackStatus': stack['StackStatus']} for stack in response['Stacks']]
-    return stacks
-
+    for function in response['Functions']:
+        function_name = function.get('FunctionName')
+        aws_resources['Lambda Functions'][function_name] = {
+            'FunctionArn': function.get('FunctionArn'),
+            'Runtime': function.get('Runtime'),
+            'Handler': function.get('Handler')
+        }
 def get_dynamodb_tables():
+    aws_resources['DynamoDB Tables'] = {}
     response = dynamodb_client.list_tables()
-    tables = [{
-        'TableName': table,
-        'TableArn': f'arn:aws:dynamodb:REGION:ACCOUNT_ID:table/{table}'  # Replace REGION and ACCOUNT_ID
-    } for table in response['TableNames']]
-    return tables
+    for table_name in response['TableNames']:
+        table_description = dynamodb_client.describe_table(TableName=table_name)
+        aws_resources['DynamoDB Tables'][table_name] = {
+            'TableArn': table_description['Table']['TableArn'],
+            'ItemCount': table_description['Table'].get('ItemCount'),
+            'TableStatus': table_description['Table'].get('TableStatus')
+        }
 def get_load_balancers():
+    aws_resources['Load Balancers'] = {}
     response = elb_client.describe_load_balancers()
-    load_balancers = [{
-        'LoadBalancerName': lb['LoadBalancerName'],  # Name
-        'LoadBalancerArn': lb['LoadBalancerArn'],  # ARN
-        'DNSName': lb['DNSName']
-    } for lb in response['LoadBalancers']]
-    return load_balancers
-
+    for lb in response['LoadBalancers']:
+        lb_name = lb.get('LoadBalancerName')
+        aws_resources['Load Balancers'][lb_name] = {
+            'LoadBalancerArn': lb.get('LoadBalancerArn'),
+            'DNSName': lb.get('DNSName'),
+            'State': lb['State'].get('Code')
+        }
 def get_ebs_volumes():
+    aws_resources['EBS Volumes'] = {}
     response = ec2_client.describe_volumes()
-    volumes = [{
-        'VolumeId': volume['VolumeId'],  # Unique ID
-        'Size': volume['Size'],
-        'State': volume['State']
-    } for volume in response['Volumes']]
-    return volumes
+    for volume in response['Volumes']:
+        volume_id = volume.get('VolumeId')
+        aws_resources['EBS Volumes'][volume_id] = {
+            'VolumeType': volume.get('VolumeType'),
+            'State': volume.get('State'),
+            'Size': volume.get('Size')
+        }
 def get_elastic_ips():
+    aws_resources['Elastic IPs'] = {}
     response = ec2_client.describe_addresses()
-    eips = [{
-        'PublicIp': address.get('PublicIp'),
-        'AllocationId': address.get('AllocationId'),
-        'AssociationId': address.get('AssociationId')
-    } for address in response['Addresses']]
-    return eips
+    for address in response['Addresses']:
+        allocation_id = address.get('AllocationId')
+        aws_resources['Elastic IPs'][allocation_id] = {
+            'PublicIp': address.get('PublicIp'),
+            'Domain': address.get('Domain')
+        }
 def get_ecr_repositories():
-    
+    aws_resources['ECR Repositories'] = {}
     response = ecr_client.describe_repositories()
-    repositories = [{
-        'RepositoryName': repo['repositoryName'],
-        'RepositoryArn': repo['repositoryArn'],
-        'CreatedAt': repo['createdAt']
-    } for repo in response['repositories']]
-    return repositories
+    for repository in response['repositories']:
+        repo_name = repository.get('repositoryName')
+        aws_resources['ECR Repositories'][repo_name] = {
+            'RepositoryArn': repository.get('repositoryArn'),
+            'RepositoryUri': repository.get('repositoryUri')
+        }
 def get_cloudfront_distributions():
-    
+    aws_resources['CloudFront Distributions'] = {}
     response = cloudfront_client.list_distributions()
-    distributions = []
-    if 'DistributionList' in response:
-        for dist in response['DistributionList']['Items']:
-            distributions.append({
-                'Id': dist['Id'],
-                'ARN': dist['ARN'],
-                'Status': dist['Status'],
-                'DomainName': dist['DomainName'],
-                'LastModifiedTime': dist['LastModifiedTime'].strftime('%Y-%m-%dT%H:%M:%S')
-            })
-    return distributions
+    for distribution in response['DistributionList']['Items']:
+        distribution_id = distribution.get('Id')
+        aws_resources['CloudFront Distributions'][distribution_id] = {
+            'DomainName': distribution.get('DomainName'),
+            'Status': distribution.get('Status')
+        }
 def get_efs_filesystems():
-    
+    aws_resources['EFS Filesystems'] = {}
     response = efs_client.describe_file_systems()
-    filesystems = [{
-        'FileSystemId': fs['FileSystemId'],
-        'CreationToken': fs['CreationToken'],
-        'SizeInBytes': fs['SizeInBytes']['Value'],
-        'CreationTime': fs['CreationTime'].strftime('%Y-%m-%dT%H:%M:%S')
-    } for fs in response['FileSystems']]
-    return filesystems
+    for fs in response['FileSystems']:
+        fs_id = fs.get('FileSystemId')
+        aws_resources['EFS Filesystems'][fs_id] = {
+            'SizeInBytes': fs.get('SizeInBytes'),
+            'State': fs.get('LifeCycleState')
+        }
 def get_sns_topics():
-    
+    aws_resources['SNS Topics'] = {}
     response = sns_client.list_topics()
-    topics = [{'TopicArn': topic['TopicArn']} for topic in response['Topics']]
-    return topics
-def get_sqs_queues():
+    for topic in response['Topics']:
+        topic_arn = topic.get('TopicArn')
+        aws_resources['SNS Topics'][topic_arn] = {'TopicArn': topic_arn}
+# def get_sqs_queues():
     
+#     response = sqs_client.list_queues()
+#     queues = [{'QueueUrl': queue_url} for queue_url in response.get('QueueUrls', [])]
+#     return queues
+def get_sqs_queues():
+    aws_resources['SQS Queues'] = {}
     response = sqs_client.list_queues()
-    queues = [{'QueueUrl': queue_url} for queue_url in response.get('QueueUrls', [])]
-    return queues
 
-
+    # Check if 'QueueUrls' exists in the response
+    if 'QueueUrls' in response:
+        for queue_url in response['QueueUrls']:
+            aws_resources['SQS Queues'][queue_url] = {'QueueUrl': queue_url}
 
 def get_elastic_beanstalk_environments():
+    aws_resources['Elastic Beanstalk Environments'] = {}
     response = elasticbeanstalk_client.describe_environments()
-    environments = []
-    for env in response['Environments']:
-        environments.append({
-            'EnvironmentName': env.get('EnvironmentName'),
-            'ApplicationName': env.get('ApplicationName'),
-            'EnvironmentId': env.get('EnvironmentId'),
-            'Status': env.get('Status'),
-        })
-    return environments
-
+    for environment in response['Environments']:
+        env_name = environment.get('EnvironmentName')
+        aws_resources['Elastic Beanstalk Environments'][env_name] = {
+            'EnvironmentArn': environment.get('EnvironmentArn'),
+            'Status': environment.get('Status')
+        }
 def get_step_functions():
+    aws_resources['Step Functions'] = {}
     response = stepfunctions_client.list_state_machines()
-    state_machines = []
     for sm in response['stateMachines']:
-        state_machines.append({
-            'Name': sm.get('name'),
+        sm_name = sm.get('name')
+        aws_resources['Step Functions'][sm_name] = {
             'StateMachineArn': sm.get('stateMachineArn'),
             'CreationDate': sm.get('creationDate')
-        })
-    return state_machines
-
-def get_sagemaker_models():
-    response = sagemaker_client.list_models()
-    models = []
-    for model in response['Models']:
-        models.append({
-            'ModelName': model.get('ModelName'),
-            'CreationTime': model.get('CreationTime'),
-            'ModelArn': model.get('ModelArn')
-        })
-    return models
-
+        }
+def get_glue_jobs():
+    aws_resources['Glue Jobs'] = {}
+    response = glue_client.get_jobs()
+    for job in response['Jobs']:
+        job_name = job.get('Name')
+        aws_resources['Glue Jobs'][job_name] = {
+            'JobArn': job.get('JobArn'),
+            'Role': job.get('Role'),
+            'CreatedOn': job.get('CreatedOn')
+        }
+def get_secrets_manager_secrets():
+    aws_resources['Secrets Manager'] = {}
+    response = secretsmanager_client.list_secrets()
+    for secret in response['SecretList']:
+        secret_name = secret.get('Name')
+        aws_resources['Secrets Manager'][secret_name] = {
+            'SecretArn': secret.get('ARN'),
+            'CreatedDate': secret.get('CreatedDate')
+        }
+def get_elasticache_clusters():
+    aws_resources['Elasticache Clusters'] = {}
+    response = elasticache_client.describe_cache_clusters()
+    for cluster in response['CacheClusters']:
+        cluster_id = cluster.get('CacheClusterId')
+        aws_resources['Elasticache Clusters'][cluster_id] = {
+            'Engine': cluster.get('Engine'),
+            'Status': cluster.get('CacheClusterStatus'),
+            'NodeType': cluster.get('CacheNodeType')
+        }
 def get_redshift_clusters():
+    aws_resources['Redshift Clusters'] = {}
     response = redshift_client.describe_clusters()
-    clusters = []
     for cluster in response['Clusters']:
-        clusters.append({
-            'ClusterIdentifier': cluster.get('ClusterIdentifier'),
-            'NodeType': cluster.get('NodeType'),
+        cluster_id = cluster.get('ClusterIdentifier')
+        aws_resources['Redshift Clusters'][cluster_id] = {
             'ClusterStatus': cluster.get('ClusterStatus'),
-            'ClusterCreateTime': cluster.get('ClusterCreateTime')
-        })
-    return clusters
-
+            'NodeType': cluster.get('NodeType'),
+            'DBName': cluster.get('DBName')
+        }
 def get_auto_scaling_groups():
+    aws_resources['Auto Scaling Groups'] = {}
     response = autoscaling_client.describe_auto_scaling_groups()
-    autoscaling_groups = []
     for group in response['AutoScalingGroups']:
-        autoscaling_groups.append({
-            'AutoScalingGroupName': group.get('AutoScalingGroupName'),
-            'LaunchConfigurationName': group.get('LaunchConfigurationName'),
+        group_name = group.get('AutoScalingGroupName')
+        aws_resources['Auto Scaling Groups'][group_name] = {
             'MinSize': group.get('MinSize'),
             'MaxSize': group.get('MaxSize'),
             'DesiredCapacity': group.get('DesiredCapacity')
-        })
-    return autoscaling_groups
+        }
+def get_sagemaker_models():
+    aws_resources['SageMaker Models'] = {}
+    response = sagemaker_client.list_models()
+    for model in response['Models']:
+        model_name = model.get('ModelName')
+        aws_resources['SageMaker Models'][model_name] = {
+            'ModelArn': model.get('ModelArn'),
+            'CreationTime': model.get('CreationTime')
+        }
+def get_kinesis_streams():
+    aws_resources['Kinesis Streams'] = {}
+    response = kinesis_client.list_streams()
+    for stream_name in response['StreamNames']:
+        stream_description = kinesis_client.describe_stream(StreamName=stream_name)
+        aws_resources['Kinesis Streams'][stream_name] = {
+            'StreamARN': stream_description['StreamDescription']['StreamARN'],
+            'StreamStatus': stream_description['StreamDescription']['StreamStatus']
+        }
+def get_codepipeline_pipelines():
+    aws_resources['CodePipelines'] = {}
+    response = codepipeline_client.list_pipelines()
+    for pipeline in response['pipelines']:
+        pipeline_name = pipeline.get('name')
+        aws_resources['CodePipelines'][pipeline_name] = {
+            'PipelineArn': pipeline.get('pipelineArn'),
+            'Created': pipeline.get('created')
+        }
+def get_codebuild_projects():
+    aws_resources['CodeBuild Projects'] = {}
+    response = codebuild_client.list_projects()
+    for project_name in response['projects']:
+        project_details = codebuild_client.batch_get_projects(names=[project_name])
+        aws_resources['CodeBuild Projects'][project_name] = {
+            'ProjectArn': project_details['projects'][0]['arn'],
+            'SourceType': project_details['projects'][0]['source']['type']
+        }
+def get_codedeploy_applications():
+    aws_resources['CodeDeploy Applications'] = {}
+    response = codedeploy_client.list_applications()
+    for app_name in response['applications']:
+        aws_resources['CodeDeploy Applications'][app_name] = {
+            'ApplicationName': app_name
+        }
+def get_mq_brokers():
+    aws_resources['MQ Brokers'] = {}
+    response = mq_client.list_brokers()
+    for broker in response['BrokerSummaries']:
+        broker_id = broker.get('BrokerId')
+        aws_resources['MQ Brokers'][broker_id] = {
+            'BrokerName': broker.get('BrokerName'),
+            'BrokerArn': broker.get('BrokerArn'),
+            'DeploymentMode': broker.get('DeploymentMode')
+        }
+def get_workspaces():
+    aws_resources['Workspaces'] = {}
+    response = workspaces_client.describe_workspaces()
+    for workspace in response['Workspaces']:
+        workspace_id = workspace.get('WorkspaceId')
+        aws_resources['Workspaces'][workspace_id] = {
+            'State': workspace.get('State'),
+            'UserName': workspace.get('UserName')
+        }
+def get_aws_resources():
+    get_ec2_instances()
+    get_s3_buckets()
+    get_rds_instances()
+    get_iam_roles()
+    get_auto_scaling_groups()
+    get_vpcs()
+    get_lambda_functions()
+    get_dynamodb_tables()
+    get_load_balancers()
+    get_ebs_volumes()
+    get_elastic_ips()
+    get_ecr_repositories()
+    get_cloudfront_distributions()
+    get_efs_filesystems()
+    get_sns_topics()
+    get_sqs_queues()
+    get_elastic_beanstalk_environments()
+    get_step_functions()
+    get_glue_jobs()
+    get_secrets_manager_secrets()
+    get_elasticache_clusters()
+    get_redshift_clusters()
+    get_auto_scaling_groups()
+    get_sagemaker_models()
+    get_kinesis_streams()
+    get_codepipeline_pipelines()
+    get_codebuild_projects()
+    get_codedeploy_applications()
+    get_mq_brokers()
+    get_workspaces()
+    return aws_resources
 
-def get_elasticache_clusters():
-    response = elasticache_client.describe_cache_clusters()
-    clusters = []
-    for cluster in response['CacheClusters']:
-        clusters.append({
-            'CacheClusterId': cluster.get('CacheClusterId'),
-            'Engine': cluster.get('Engine'),
-            'CacheNodeType': cluster.get('CacheNodeType'),
-            'CacheClusterStatus': cluster.get('CacheClusterStatus')
-        })
-    return clusters
-
-def get_secrets_manager_secrets():
-    response = secretsmanager_client.list_secrets()
-    secrets = []
-    for secret in response['SecretList']:
-        secrets.append({
-            'Name': secret.get('Name'),
-            'SecretArn': secret.get('ARN'),
-            'LastChangedDate': secret.get('LastChangedDate')
-        })
-    return secrets
-
-def get_glue_jobs():
-    response = glue_client.get_jobs()
-    jobs = []
-    for job in response['Jobs']:
-        jobs.append({
-            'JobName': job.get('Name'),
-            'JobArn': job.get('Role'),
-            'CreatedOn': job.get('CreatedOn')
-        })
-    return jobs
-
-if __name__ == "__main__":
+# if __name__ == "__main__":
     
-    print("EC2 Instances:", get_ec2_instances())
-    print("S3 Buckets:", get_s3_buckets())
-    print("RDS Instances:", get_rds_instances())
-    print("IAM Roles:", get_iam_roles())
-    print("VPCs:", get_vpcs())
-    print("Lambda Functions:",get_lambda_functions())
-    print("dynamodb tables:",get_dynamodb_tables())
-    print("load balancers:",get_load_balancers())
-    print("ebs volumes:",get_ebs_volumes())
-    print("Elastic IPs:", get_elastic_ips())
-    print("ECR Repositories:", get_ecr_repositories())
-    print("Cloudfront Distributions:", get_cloudfront_distributions())
-    print("efs filesystems:", get_efs_filesystems())
-    print("SNS Topics:", get_sns_topics())
-    print("SQS Queues:", get_sqs_queues())
-    print("elastic beanstalk environments:", get_elastic_beanstalk_environments())
-    print("step functions:", get_step_functions())
-    print("glue jobs:", get_glue_jobs())
-    print("secrets:", get_secrets_manager_secrets())
-    print("elastic cache clusters:", get_elasticache_clusters())
-    print("redshift clusters:", get_redshift_clusters())
-    print("auto scaling groups:", get_auto_scaling_groups())
-    print("sagemaker models:", get_sagemaker_models())
-
+#     get_aws_resources()
+#     print(aws_resources)
