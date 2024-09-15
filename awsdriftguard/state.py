@@ -46,5 +46,5 @@ def parse_all_state_files(directory_path):
     
     return all_parsed_resources
 
-def get_state_file_resources(directory_path='C:/Users/Jay Patel/Downloads/state files'):
+def get_state_file_resources(directory_path):
     return parse_all_state_files(directory_path)
