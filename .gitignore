@@ -69,7 +69,7 @@ env/
 ENV/
 .venv/
 .env/
-
+.env
 # AWS Credentials
 .aws/
 
